@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { redisClient } from "../redis/redis-client";
 
 interface UserPayload {
   id: string;
@@ -30,6 +29,9 @@ export const currentUser = async (
       req.session.jwt,
       process.env.JWT_KEY!
     ) as UserPayload;
+
+    // Import redisClient dynamically to make it mockable
+    const { redisClient } = await import("../redis/redis-client");
 
     const isBlacklisted = await redisClient.get(`blacklist:${payload.jti}`);
     if (isBlacklisted === "1") {
