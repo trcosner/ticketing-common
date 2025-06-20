@@ -66,9 +66,72 @@ export const createMockRedisConnection = () => {
   const mockClient = createMockRedisClient();
 
   return class MockRedisConnection {
-    static getInstance = createMockResolvedValue(mockClient);
+    static async getInstance() {
+      return mockClient;
+    }
     static instance = mockClient;
   };
+};
+
+/**
+ * Mock SimpleRedisClient to prevent Redis connections
+ */
+export const createMockSimpleRedisClient = () => {
+  const mockClient = createMockRedisClient();
+
+  return new (class MockSimpleRedisClient {
+    async get(key: string) {
+      return mockClient.get(key);
+    }
+    async set(key: string, value: string, expireInSeconds?: number) {
+      return mockClient.set(key, value);
+    }
+    async del(key: string) {
+      return mockClient.del(key);
+    }
+    async exists(key: string) {
+      return mockClient.exists(key);
+    }
+    async expire(key: string, seconds: number) {
+      return mockClient.expire(key, seconds);
+    }
+    async setJSON(key: string, value: any, expireInSeconds?: number) {
+      return mockClient.setJSON(key, value);
+    }
+    async getJSON(key: string) {
+      return mockClient.getJSON(key);
+    }
+    async sAdd(key: string, ...members: string[]) {
+      return mockClient.sAdd(key, ...members);
+    }
+    async sMembers(key: string) {
+      return mockClient.sMembers(key);
+    }
+    async sRem(key: string, ...members: string[]) {
+      return mockClient.sRem(key, ...members);
+    }
+    async sCard(key: string) {
+      return mockClient.sCard(key);
+    }
+    async zAdd(key: string, score: number, member: string) {
+      return mockClient.zAdd(key, score, member);
+    }
+    async zCard(key: string) {
+      return mockClient.zCard(key);
+    }
+    async zRemRangeByScore(key: string, min: number, max: number) {
+      return mockClient.zRemRangeByScore(key, min, max);
+    }
+    async incr(key: string) {
+      return mockClient.incr(key);
+    }
+    async multi() {
+      return mockClient.multi();
+    }
+    async ping() {
+      return mockClient.ping();
+    }
+  })();
 };
 
 /**
@@ -77,7 +140,7 @@ export const createMockRedisConnection = () => {
  */
 export const createCommonModuleMock = (originalModule: any) => ({
   ...originalModule,
-  redisClient: createMockRedisClient(),
+  redisClient: createMockSimpleRedisClient(),
   RedisConnection: createMockRedisConnection(),
   // Keep real JWT functions for authentication
   generateJWT: originalModule.generateJWT,
