@@ -7,6 +7,32 @@ export class SimpleRedisClient {
   private redis: RedisClient | null = null;
 
   private async getConnection(): Promise<RedisClient> {
+    // In test environment, return a mock Redis client to avoid connection attempts
+    if (process.env.NODE_ENV === "test") {
+      return {
+        isReady: true,
+        get: async () => null,
+        set: async () => "OK",
+        del: async () => 1,
+        exists: async () => 0,
+        expire: async () => 1,
+        json: {
+          set: async () => "OK",
+          get: async () => null,
+        },
+        sAdd: async () => 1,
+        sMembers: async () => [],
+        sRem: async () => 1,
+        sCard: async () => 0,
+        zAdd: async () => 1,
+        zCard: async () => 0,
+        zRemRangeByScore: async () => 0,
+        incr: async () => 1,
+        multi: async () => [],
+        ping: async () => "PONG",
+      } as any;
+    }
+
     if (!this.redis?.isReady) {
       this.redis = await RedisConnection.getInstance();
     }
