@@ -26,3 +26,4 @@ export * from "./events/expiration/expiration-complete-event";
 export * from "./events/payment/payment-created-event";
 
 export * from "./redis/redis-connection";
+export * from "./redis/redis-client";
