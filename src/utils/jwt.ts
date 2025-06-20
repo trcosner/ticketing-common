@@ -5,6 +5,7 @@ export interface JWTPayload {
   id: string;
   email: string;
   jti: string; // JWT ID for blacklisting
+  exp: number; // expires at from JWT
 }
 
 export const generateJWT = (payload: { id: string; email: string }) => {
