@@ -1,40 +1,72 @@
-import { jest } from "@jest/globals";
+/**
+ * Test utilities for mocking Redis and other common dependencies
+ * These utilities are designed to work with Jest testing framework
+ */
+
+// Type for Jest mock function - defined here to avoid dependency on Jest types
+type MockFunction = any;
+
+/**
+ * Creates a mock function that returns a resolved promise
+ * This is equivalent to jest.fn().mockResolvedValue(value)
+ */
+const createMockResolvedValue = (value: any): MockFunction => {
+  const mockFn = (() => Promise.resolve(value)) as any;
+  mockFn.mockResolvedValue = (newValue: any) => {
+    mockFn.mockImplementation(() => Promise.resolve(newValue));
+    return mockFn;
+  };
+  mockFn.mockResolvedValueOnce = (newValue: any) => {
+    let called = false;
+    const originalImpl = mockFn;
+    mockFn.mockImplementation((...args: any[]) => {
+      if (!called) {
+        called = true;
+        return Promise.resolve(newValue);
+      }
+      return originalImpl(...args);
+    });
+    return mockFn;
+  };
+  return mockFn;
+};
 
 /**
  * Mock Redis client for testing
  * This provides a consistent mock across all services
  */
 export const createMockRedisClient = () => ({
-  get: jest.fn().mockResolvedValue(null as any),
-  set: jest.fn().mockResolvedValue(true as any),
-  del: jest.fn().mockResolvedValue(true as any),
-  exists: jest.fn().mockResolvedValue(false as any),
-  expire: jest.fn().mockResolvedValue(true as any),
-  setJSON: jest.fn().mockResolvedValue(true as any),
-  getJSON: jest.fn().mockResolvedValue(null as any),
-  sAdd: jest.fn().mockResolvedValue(1 as any),
-  sMembers: jest.fn().mockResolvedValue([] as any),
-  sRem: jest.fn().mockResolvedValue(1 as any),
-  sCard: jest.fn().mockResolvedValue(0 as any),
-  zAdd: jest.fn().mockResolvedValue(1 as any),
-  zCard: jest.fn().mockResolvedValue(0 as any),
-  zRemRangeByScore: jest.fn().mockResolvedValue(0 as any),
-  incr: jest.fn().mockResolvedValue(1 as any),
-  multi: jest.fn().mockResolvedValue([] as any),
-  ping: jest.fn().mockResolvedValue(true as any),
+  get: createMockResolvedValue(null),
+  set: createMockResolvedValue(true),
+  del: createMockResolvedValue(true),
+  exists: createMockResolvedValue(false),
+  expire: createMockResolvedValue(true),
+  setJSON: createMockResolvedValue(true),
+  getJSON: createMockResolvedValue(null),
+  sAdd: createMockResolvedValue(1),
+  sMembers: createMockResolvedValue([]),
+  sRem: createMockResolvedValue(1),
+  sCard: createMockResolvedValue(0),
+  zAdd: createMockResolvedValue(1),
+  zCard: createMockResolvedValue(0),
+  zRemRangeByScore: createMockResolvedValue(0),
+  incr: createMockResolvedValue(1),
+  multi: createMockResolvedValue([]),
+  ping: createMockResolvedValue(true),
   isReady: true,
-  connect: jest.fn().mockResolvedValue(undefined as any),
-  disconnect: jest.fn().mockResolvedValue(undefined as any),
+  connect: createMockResolvedValue(undefined),
+  disconnect: createMockResolvedValue(undefined),
 });
 
 /**
  * Mock Redis connection class to prevent actual connections during tests
+ * This will be used when TokenService tries to get a Redis instance
  */
 export const createMockRedisConnection = () => {
   const mockClient = createMockRedisClient();
 
   return class MockRedisConnection {
-    static getInstance = jest.fn().mockResolvedValue(mockClient);
+    static getInstance = createMockResolvedValue(mockClient);
     static instance = mockClient;
   };
 };
