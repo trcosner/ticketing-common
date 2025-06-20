@@ -38,7 +38,18 @@ export const currentUser = async (
       return next();
     }
 
-    req.currentUser = payload;
+    let cachedUser = await redisClient.getJSON(`user:${payload.id}`);
+
+    if (cachedUser) {
+      console.log(`User ${payload.id} loaded from cache`);
+      req.currentUser = { ...payload, ...cachedUser };
+    } else {
+      console.log(`User ${payload.id} not in cache, using JWT payload`);
+      req.currentUser = payload;
+
+      // Cache the user data for next time (5 minute TTL)
+      await redisClient.setJSON(`user:${payload.id}`, payload, 300);
+    }
   } catch (err) {}
 
   next();
