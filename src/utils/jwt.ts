@@ -5,6 +5,7 @@ export interface JWTPayload {
   id: string;
   email: string;
   jti: string; // JWT ID for blacklisting
+  iat: number;
   exp: number; // expires at from JWT
 }
 
