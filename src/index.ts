@@ -27,6 +27,7 @@ export * from "./events/payment/payment-created-event";
 
 export * from "./redis/redis-connection";
 export * from "./redis/redis-client";
+export * from "./redis/refresh-token-cache";
 
 // JWT utilities
 export * from "./utils/jwt";

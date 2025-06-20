@@ -13,47 +13,66 @@ export class SimpleRedisClient {
     return this.redis;
   }
 
-  // Basic operations
-  async set(key: string, value: string, ttlSeconds?: number): Promise<boolean> {
+  // Safe operation wrapper with default fallback
+  private async safeOperation<T>(
+    operation: (redis: RedisClient) => Promise<T>,
+    fallback: T
+  ): Promise<T> {
     try {
       const redis = await this.getConnection();
-      const options = ttlSeconds ? { EX: ttlSeconds } : undefined;
-      const result = await redis.set(key, value, options);
-      return result === "OK";
+      return await operation(redis);
     } catch (error) {
-      console.error("Redis SET error:", error);
-      return false;
+      console.error("Redis operation failed:", error);
+      return fallback;
     }
+  }
+
+  // Basic operations
+  async set(
+    key: string,
+    value: string,
+    options?: { EX?: number; PX?: number }
+  ): Promise<boolean> {
+    const result = await this.safeOperation(
+      async (redis) => redis.set(key, value, options),
+      null
+    );
+    return result === "OK";
   }
 
   async get(key: string): Promise<string | null> {
-    try {
-      const redis = await this.getConnection();
-      return await redis.get(key);
-    } catch (error) {
-      console.error("Redis GET error:", error);
-      return null;
-    }
+    return this.safeOperation(async (redis) => redis.get(key), null);
   }
 
   async del(key: string): Promise<boolean> {
-    try {
-      const redis = await this.getConnection();
-      const result = await redis.del(key);
-      return result === 1;
-    } catch (error) {
-      console.error("Redis DEL error:", error);
-      return false;
-    }
+    const result = await this.safeOperation(async (redis) => redis.del(key), 0);
+    return result === 1;
   }
 
-  // JSON helper methods
+  async exists(key: string): Promise<boolean> {
+    const result = await this.safeOperation(
+      async (redis) => redis.exists(key),
+      0
+    );
+    return result === 1;
+  }
+
+  async expire(key: string, seconds: number): Promise<boolean> {
+    const result = await this.safeOperation(
+      async (redis) => redis.expire(key, seconds),
+      0 // Use 0 as fallback since redis.expire returns number
+    );
+    return result === 1; // Convert number to boolean (1 = true, 0 = false)
+  }
+
+  // JSON operations
   async setJSON(
     key: string,
     value: any,
     ttlSeconds?: number
   ): Promise<boolean> {
-    return this.set(key, JSON.stringify(value), ttlSeconds);
+    const options = ttlSeconds ? { EX: ttlSeconds } : undefined;
+    return this.set(key, JSON.stringify(value), options);
   }
 
   async getJSON<T>(key: string): Promise<T | null> {
@@ -63,12 +82,96 @@ export class SimpleRedisClient {
     try {
       return JSON.parse(result);
     } catch (error) {
-      console.error("JSON parse error:", error);
+      console.error("Failed to parse JSON from Redis:", error);
       return null;
     }
   }
 
-  // Health check
+  // Set operations
+  async sAdd(key: string, ...members: string[]): Promise<number> {
+    return this.safeOperation(async (redis) => redis.sAdd(key, members), 0);
+  }
+
+  async sMembers(key: string): Promise<string[]> {
+    return this.safeOperation(async (redis) => redis.sMembers(key), []);
+  }
+
+  async sRem(key: string, ...members: string[]): Promise<number> {
+    return this.safeOperation(async (redis) => redis.sRem(key, members), 0);
+  }
+
+  async sCard(key: string): Promise<number> {
+    return this.safeOperation(async (redis) => redis.sCard(key), 0);
+  }
+
+  // Sorted set operations for rate limiting
+  async zAdd(key: string, score: number, member: string): Promise<number> {
+    return this.safeOperation(
+      async (redis) => redis.zAdd(key, { score, value: member }),
+      0
+    );
+  }
+
+  async zCard(key: string): Promise<number> {
+    return this.safeOperation(async (redis) => redis.zCard(key), 0);
+  }
+
+  async zRemRangeByScore(
+    key: string,
+    min: number,
+    max: number
+  ): Promise<number> {
+    return this.safeOperation(
+      async (redis) => redis.zRemRangeByScore(key, min, max),
+      0
+    );
+  }
+
+  // Increment operations
+  async incr(key: string): Promise<number> {
+    return this.safeOperation(async (redis) => redis.incr(key), 0);
+  }
+
+  // Multi/Pipeline operations
+  async multi(operations: Array<() => Promise<any>>): Promise<any[]> {
+    return this.safeOperation(async (redis) => {
+      const results = [];
+      for (const operation of operations) {
+        try {
+          const result = await operation();
+          results.push(result);
+        } catch (error) {
+          results.push(null);
+        }
+      }
+      return results;
+    }, []);
+  }
+
+  // Rate limiting with sliding window
+  async checkRateLimit(
+    key: string,
+    limit: number,
+    windowMs: number
+  ): Promise<boolean> {
+    return this.safeOperation(async (redis) => {
+      const now = Date.now();
+      const windowStart = now - windowMs;
+
+      // Remove old entries
+      await redis.zRemRangeByScore(key, 0, windowStart);
+      // Add current request
+      await redis.zAdd(key, { score: now, value: `${now}-${Math.random()}` });
+      // Count current requests
+      const count = await redis.zCard(key);
+      // Set expiry
+      await redis.expire(key, Math.ceil(windowMs / 1000));
+
+      return count <= limit;
+    }, false);
+  }
+
+  // Health check method
   async ping(): Promise<boolean> {
     try {
       const redis = await this.getConnection();
@@ -81,5 +184,5 @@ export class SimpleRedisClient {
   }
 }
 
-// Export a singleton instance
+// Singleton instance
 export const redisClient = new SimpleRedisClient();
