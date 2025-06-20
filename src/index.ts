@@ -31,3 +31,6 @@ export * from "./redis/refresh-token-cache";
 
 // JWT utilities
 export * from "./utils/jwt";
+
+// Test utilities (only import in test environments)
+export * from "./test/mocks";
